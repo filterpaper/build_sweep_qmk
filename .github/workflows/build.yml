@@ -1,0 +1,56 @@
+name: Build QMK for Sweep
+on:
+  workflow_dispatch:
+    inputs:
+      conv:
+        description: Converter
+        required: true
+        default: 'rp2040_ce'
+        type: choice
+        options:
+        - "blok"
+        - "elite-pi"
+        - "kb2040"
+        - "promicro_rp2040"
+        - "rp2040_ce"
+      keymap:
+        description: Keymap
+        required: true
+        default: 'via'
+        type: choice
+        options:
+        - "via"
+        - "default"
+
+jobs:
+  build:
+    name: Build Sweep
+    runs-on: ubuntu-latest
+    container: qmkfm/qmk_cli
+    strategy:
+      fail-fast: false
+      matrix:
+        split: [left, right]
+    steps:
+    - name: Checkout QMK
+      uses: actions/checkout@main
+      with:
+        repository: qmk/qmk_firmware
+        ref: develop
+        submodules: true
+
+    - name: Setup safe directory
+      run: git config --global --add safe.directory '*'
+
+    - name: Compile
+      run: >
+        qmk compile -j 3 -kb ferris/sweep -km ${{ inputs.keymap }}
+        -e CONVERT_TO=${{ inputs.conv }} -e MAKECMDGOALS=uf2-split-${{ matrix.split }}
+        -e TARGET=ferris_sweep_${{ inputs.keymap }}_${{ inputs.conv }}_${{ matrix.split }}
+
+    - name: Archive firmware
+      uses: actions/upload-artifact@main
+      with:
+        retention-days: 60
+        name: ferris_sweep_${{ inputs.keymap }}_${{ inputs.conv }}
+        path: "*.uf2"
